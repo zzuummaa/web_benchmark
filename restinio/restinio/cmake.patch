@@ -1,0 +1,81 @@
+diff --git a/dev/CMakeLists.txt b/dev/CMakeLists.txt
+index bbc4bce..6e64f66 100644
+--- a/dev/CMakeLists.txt
++++ b/dev/CMakeLists.txt
+@@ -43,7 +43,7 @@ SET(RESTINIO_USE_BOOST_ASIO_VALUES "none;static;shared")
+ 
+ set_property(CACHE RESTINIO_USE_BOOST_ASIO PROPERTY STRINGS ${RESTINIO_USE_BOOST_ASIO_VALUES})
+ 
+-project(RESTinioRootProject CXX)
++project(restinio CXX)
+ 
+ IF (RESTINIO_USE_EXTERNAL_SOBJECTIZER AND NOT RESTINIO_ALLOW_SOBJECTIZER)
+ 	message(FATAL_ERROR "RESTINIO_USE_EXTERNAL_SOBJECTIZER can't be set without RESTINIO_ALLOW_SOBJECTIZER")
+@@ -65,7 +65,7 @@ IF (RESTINIO_MASTER_PROJECT)
+ 	# RESTinio dependencies:
+ 	# ASIO or Boost::ASIO
+ 	IF ( RESTINIO_USE_BOOST_ASIO MATCHES "none" )
+-		SET( RESTINIO_STAND_ALONE_ASIO_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/asio/include )
++		SET( RESTINIO_STAND_ALONE_ASIO_HEADERS ${ASIO_DIR}/include )
+ 		SET( RESTINIO_STAND_ALONE_ASIO_DEFINES -DASIO_STANDALONE -DASIO_HAS_STD_CHRONO -DASIO_DISABLE_STD_STRING_VIEW)
+ 
+ 		# Try to find boost for boost regex.
+@@ -85,6 +85,8 @@ IF (RESTINIO_MASTER_PROJECT)
+ 		find_package(Boost 1.66.0 REQUIRED COMPONENTS system regex)
+ 	ENDIF ()
+ 
++	include_directories("${CMAKE_SOURCE_DIR}/clara")
++
+ 	IF (RESTINIO_FIND_DEPS)
+ 		# Require necessary packages.
+ 
+@@ -97,7 +99,7 @@ IF (RESTINIO_MASTER_PROJECT)
+ 		IF (RESTINIO_USE_EXTERNAL_HTTP_PARSER)
+ 			find_package(http-parser REQUIRED)
+ 		ELSE ()
+-			find_package(unofficial-http-parser CONFIG REQUIRED)
++			add_subdirectory(nodejs/http_parser)
+ 		ENDIF ()
+ 
+ 		# fmtlib
+@@ -105,8 +107,6 @@ IF (RESTINIO_MASTER_PROJECT)
+ 	ELSE ()
+ 		# Add necessary dependecies.
+ 
+-		include_directories("${CMAKE_SOURCE_DIR}/clara")
+-
+ 		# HTTP parser
+ 		IF (RESTINIO_USE_EXTERNAL_HTTP_PARSER)
+ 			find_package(http-parser REQUIRED)
+diff --git a/dev/restinio/CMakeLists.txt b/dev/restinio/CMakeLists.txt
+index edd19a0..fe35893 100644
+--- a/dev/restinio/CMakeLists.txt
++++ b/dev/restinio/CMakeLists.txt
+@@ -173,4 +173,7 @@ IF (RESTINIO_INSTALL)
+ 		install( FILES ${HEADER_FILE} DESTINATION ${RESTINIO_INC_DIR}/${DIR} )
+ 	ENDFOREACH ()
+ 
++	install( FILES ../clara/clara.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
++	install( FILES ../clara/clara_textflow.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
++
+ ENDIF ()
+diff --git a/dev/test/catch_main/CMakeLists.txt b/dev/test/catch_main/CMakeLists.txt
+index 037dd95..d56f11a 100644
+--- a/dev/test/catch_main/CMakeLists.txt
++++ b/dev/test/catch_main/CMakeLists.txt
+@@ -1,8 +1,13 @@
+ add_library(restinio_catch_main STATIC catch_main.cpp)
+ add_library(restinio::catch_main ALIAS restinio_catch_main)
+ 
+-if (RESTINIO_FIND_DEPS)
+-    TARGET_LINK_LIBRARIES(restinio_catch_main Catch2::Catch2)
++if (NOT RESTINIO_FIND_DEPS)
++    # Catch2
++    IF (RESTINIO_TEST)
++        find_package(Catch2 CONFIG REQUIRED)
++    ENDIF ()
+ endif()
+ 
++TARGET_LINK_LIBRARIES(restinio_catch_main Catch2::Catch2)
++
+ TARGET_INCLUDE_DIRECTORIES(restinio_catch_main PRIVATE ${CMAKE_SOURCE_DIR})

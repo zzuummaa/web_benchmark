@@ -1,0 +1,10 @@
+if(NOT EXISTS "${ASIO_DIR}/include/asio.hpp")
+    message(FATAL_ERROR "ASIO library not found")
+endif()
+
+add_library(asio INTERFACE)
+target_include_directories(asio INTERFACE ${ASIO_DIR}/include)
+target_link_libraries(asio INTERFACE pthread)
+if (WIN32)
+    target_link_libraries(asio INTERFACE ws2_32 wsock32)
+endif()
