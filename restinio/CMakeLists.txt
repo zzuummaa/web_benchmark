@@ -8,5 +8,5 @@ find_package(unofficial-http-parser REQUIRED)
 find_package(restinio REQUIRED)
 include(cmake/asio-targets.cmake)
 
-add_executable(restinio_benchmark main.cpp)
-target_link_libraries(restinio_benchmark restinio::restinio asio)
+add_executable(single_handler single_handler_bench.cpp)
+target_link_libraries(single_handler restinio::restinio asio)

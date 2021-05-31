@@ -15,6 +15,7 @@ struct app_args_t
 	std::string m_address{ "localhost" };
 	std::uint16_t m_port{ 8080 };
 	std::size_t m_pool_size{ 1 };
+    bool m_trace_server{ false };
 
 	std::size_t m_max_parallel_connections{ 0u };
 
@@ -37,6 +38,9 @@ struct app_args_t
 					( fmt::format(
 						"The size of a thread pool to run server (default: {})",
 						result.m_pool_size ) )
+            | Opt( result.m_trace_server )
+                    [ "-t" ][ "--trace" ]
+                    ( "Enable trace server" )
 			| Opt( result.m_max_parallel_connections, "max parallel connections" )
 					[ "-m" ][ "--max-parallel-connections" ]
 					( fmt::format(
