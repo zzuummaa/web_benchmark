@@ -7,29 +7,12 @@
 
 #include <restinio/all.hpp>
 
-#include "common_args/app_args.hpp"
+#include "app_args.hpp"
+#include "server_settings_traits.h"
+#include "snippet_service.h"
+#include "request_handler.h"
 
-const std::string resp_body{ "Hello world!" };
-
-struct req_handler_t
-{
-	auto operator () ( restinio::request_handle_t req ) const
-	{
-		if( restinio::http_method_get() == req->header().method() &&
-			req->header().request_target() == "/" )
-		{
-			return
-				req->create_response()
-					.append_header( "Server", "RESTinio Benchmark" )
-					// .append_header_date_field()
-					.append_header( "Content-Type", "text/plain; charset=utf-8" )
-					.set_body( resp_body )
-					.done();
-		}
-
-		return restinio::request_rejected();
-	}
-};
+using default_req_handler = req_handler_t<map_snippet_service_t>;
 
 template< typename Settings >
 void
@@ -88,62 +71,6 @@ void run_app( const app_args_t args )
 	restinio::run( std::move(settings) );
 }
 
-struct multi_thread_no_limit_no_logger_traits_t : public restinio::traits_t<
-		restinio::asio_timer_manager_t,
-		restinio::null_logger_t,
-		req_handler_t >
-{};
-
-struct multi_thread_no_limit_with_logger_traits_t : public restinio::traits_t<
-        restinio::asio_timer_manager_t,
-        restinio::shared_ostream_logger_t,
-        req_handler_t >
-{};
-
-struct multi_thread_with_limit_no_logger_traits_t : public restinio::traits_t<
-		restinio::asio_timer_manager_t,
-		restinio::null_logger_t,
-		req_handler_t >
-{
-	static constexpr bool use_connection_count_limiter = true;
-};
-
-struct multi_thread_with_limit_with_logger_traits_t : public restinio::traits_t<
-        restinio::asio_timer_manager_t,
-        restinio::shared_ostream_logger_t,
-        req_handler_t >
-{
-    static constexpr bool use_connection_count_limiter = true;
-};
-
-struct single_thread_no_limit_no_logger_traits_t : public restinio::single_thread_traits_t<
-		restinio::asio_timer_manager_t,
-		restinio::null_logger_t,
-		req_handler_t >
-{};
-
-struct single_thread_no_limit_with_logger_traits_t : public restinio::single_thread_traits_t<
-        restinio::asio_timer_manager_t,
-        restinio::single_threaded_ostream_logger_t,
-        req_handler_t >
-{};
-
-struct single_thread_with_limit_no_logger_traits_t : public restinio::single_thread_traits_t<
-		restinio::asio_timer_manager_t,
-		restinio::null_logger_t,
-		req_handler_t >
-{
-	static constexpr bool use_connection_count_limiter = true;
-};
-
-struct single_thread_with_limit_with_logger_traits_t : public restinio::single_thread_traits_t<
-        restinio::asio_timer_manager_t,
-        restinio::single_threaded_ostream_logger_t,
-        req_handler_t >
-{
-    static constexpr bool use_connection_count_limiter = true;
-};
-
 int main(int argc, const char *argv[]) {
     try {
         const auto args = app_args_t::parse(argc, argv);
@@ -154,29 +81,29 @@ int main(int argc, const char *argv[]) {
             if (1 < args.m_pool_size) {
                 if (0u == args.m_max_parallel_connections) {
                     if (args.m_trace_server) {
-                        run_app<multi_thread_no_limit_with_logger_traits_t>(args);
+                        run_app<multi_thread_no_limit_with_logger_traits_t<default_req_handler>>(args);
                     } else {
-                        run_app<multi_thread_no_limit_no_logger_traits_t>(args);
+                        run_app<multi_thread_no_limit_no_logger_traits_t<default_req_handler>>(args);
                     }
                 } else {
                     if (args.m_trace_server) {
-                        run_app<multi_thread_with_limit_with_logger_traits_t>(args);
+                        run_app<multi_thread_with_limit_with_logger_traits_t<default_req_handler>>(args);
                     } else {
-                        run_app<multi_thread_with_limit_no_logger_traits_t>(args);
+                        run_app<multi_thread_with_limit_no_logger_traits_t<default_req_handler>>(args);
                     }
                 }
             } else if (1 == args.m_pool_size) {
                 if (0u == args.m_max_parallel_connections) {
                     if (args.m_trace_server) {
-                        run_app<single_thread_no_limit_with_logger_traits_t>(args);
+                        run_app<single_thread_no_limit_with_logger_traits_t<default_req_handler>>(args);
                     } else {
-                        run_app<single_thread_no_limit_no_logger_traits_t>(args);
+                        run_app<single_thread_no_limit_no_logger_traits_t<default_req_handler>>(args);
                     }
                 } else {
                     if (args.m_trace_server) {
-                        run_app<single_thread_with_limit_with_logger_traits_t>(args);
+                        run_app<single_thread_with_limit_with_logger_traits_t<default_req_handler>>(args);
                     } else {
-                        run_app<single_thread_with_limit_no_logger_traits_t>(args);
+                        run_app<single_thread_with_limit_no_logger_traits_t<default_req_handler>>(args);
                     }
                 }
             } else {
