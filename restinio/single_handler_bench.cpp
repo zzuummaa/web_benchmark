@@ -40,7 +40,7 @@ setup_common_values(
 	using namespace std::chrono;
 
 	settings
-		.address( "localhost" )
+		.address( args.m_address )
 		.port( args.m_port )
 		.buffer_size( 1024u )
 		.read_next_http_message_timelimit( 5s )
