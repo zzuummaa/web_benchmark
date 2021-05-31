@@ -10,3 +10,8 @@ include(cmake/asio-targets.cmake)
 
 add_executable(single_handler single_handler_bench.cpp)
 target_link_libraries(single_handler restinio::restinio asio)
+
+if (MSYS OR MINGW)
+    # Workaround linker bug
+    target_link_options(single_handler PUBLIC -Wl,--default-image-base-low)
+endif ()
