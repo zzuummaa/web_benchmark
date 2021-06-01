@@ -11,8 +11,9 @@
 #include "server_settings_traits.h"
 #include "snippet_service.h"
 #include "request_handler.h"
+#include "json_converter.h"
 
-using default_req_handler = req_handler_t<map_snippet_service_t>;
+using default_req_handler = req_handler_t<map_snippet_service_t, json_body_converter_t>;
 
 template< typename Settings >
 void

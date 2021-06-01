@@ -10,10 +10,12 @@
 #include <optional>
 #include <mutex>
 
+#include "dto.h"
+
 struct map_snippet_service_t {
-    map_snippet_service_t() : id_counter(0) {
+    map_snippet_service_t() {
         std::lock_guard lc(m);
-        for (; id_counter < 10'000; id_counter++) {
+        for (size_t id_counter = 0; id_counter < 10'000; id_counter++) {
             snippets.insert(std::make_pair(id_counter, "map snippet test id " + std::to_string(id_counter)));
         }
     }
@@ -24,18 +26,23 @@ struct map_snippet_service_t {
         return it == snippets.end() ? std::nullopt : std::make_optional(it->second);
     }
 
-    std::optional<size_t> add(const std::string& snippet) {
-        std::lock_guard lc(m);
-        auto pair = std::make_pair(id_counter, snippet);
-        snippets.insert(std::move(pair));
-        return id_counter++;
+    std::optional<bool> add(const snippet_record_t& record) {
+        return add(record.id, std::string(record.snippet));
     }
+
+    std::optional<bool> add(snippet_record_t&& record) {
+        return add(record.id, std::move(record.snippet));
+    }
+
 private:
     // TODO use type as template parameter for single thread mocks
     std::mutex m;
-
     std::unordered_map<size_t, std::string> snippets;
-    size_t id_counter;
+
+    std::optional<bool> add(size_t id, std::string&& snippet) {
+        std::lock_guard lc(m);
+        return snippets.insert_or_assign(id, snippet).second;
+    }
 };
 
 #endif //RESTINIO_BENCHMARK_SNIPPET_SERVICE_H

@@ -9,6 +9,8 @@
 #include <restinio/all.hpp>
 #include <cstdlib>
 
+#include "dto.h"
+
 const std::string resp_body{ "Hello world!" };
 
 template<typename ResponseBuilder,
@@ -18,7 +20,8 @@ ResponseBuilder&& add_default_headers(ResponseBuilder&& builder) {
         .append_header("Server", "RESTinio Benchmark"));
 }
 
-template<typename Snippet_Service>
+template<typename SnippetService,
+         typename BodyConverter>
 struct req_handler_t {
     auto operator()(restinio::request_handle_t req) {
         if (req->header().path() == "/"
@@ -28,7 +31,8 @@ struct req_handler_t {
             return handle_snippet_request(req);
         }
 
-        return restinio::request_rejected();
+        return add_default_headers(req->create_response(restinio::status_not_found()))
+            .done();
     }
 
     auto handle_index_request(const restinio::request_handle_t& req) {
@@ -39,7 +43,8 @@ struct req_handler_t {
                 .set_body(resp_body)
                 .done();
         }
-        return restinio::request_rejected();
+        return add_default_headers(req->create_response(restinio::status_not_found()))
+            .done();
     }
 
     auto handle_snippet_request(const restinio::request_handle_t& req) {
@@ -74,7 +79,7 @@ struct req_handler_t {
                         .done();
                 }
 
-                return add_default_headers(req->create_response(restinio::status_not_found()))
+                return add_default_headers(req->create_response())
                     // .append_header_date_field()
                     .append_header("Content-Type", "application/json; charset=utf-8")
                     .set_body("{ id: " + std::to_string(id_uint) + ", snippet: \"" + snippet.value() + "\"}")
@@ -82,15 +87,28 @@ struct req_handler_t {
             }
 
         } else if (restinio::http_method_post() == req->header().method()) {
-            // TODO implement POST logic
-            return add_default_headers(req->create_response(restinio::status_bad_request()))
+            auto dto_opt = body_converter.template to_dto<snippet_record_t>(req->body());
+            if (!dto_opt.has_value()) {
+                return add_default_headers(req->create_response(restinio::status_bad_request()))
+                    .done();
+            }
+
+            auto add_result = snippet_service.add(dto_opt.value());
+            if (!add_result.has_value()) {
+                return add_default_headers(req->create_response(restinio::status_bad_request()))
+                    .done();
+            }
+
+            return add_default_headers(req->create_response())
                 .done();
         }
-        return restinio::request_rejected();
+        return add_default_headers(req->create_response(restinio::status_not_found()))
+            .done();
     }
 
 private:
-    Snippet_Service snippet_service;
+    SnippetService snippet_service;
+    BodyConverter body_converter;
 };
 
 #endif //RESTINIO_BENCHMARK_REQUEST_HANDLER_H
