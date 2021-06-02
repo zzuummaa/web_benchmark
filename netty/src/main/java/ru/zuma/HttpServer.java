@@ -8,13 +8,14 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import ru.zuma.endpoint.RestEndpoint;
+import ru.zuma.endpoint.SnippetEndpoint;
+
+import java.util.List;
+
+import static java.util.List.of;
 
 public class HttpServer {
-
-    private static final Logger logger = LoggerFactory.getLogger(HttpServer.class);
-
     private final int port;
 
     public static void main(String[] args) throws Exception {
@@ -33,6 +34,8 @@ public class HttpServer {
     public void run() throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+        List<RestEndpoint> endpoints = List.of(new SnippetEndpoint("/snippet"));
+
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
@@ -44,7 +47,7 @@ public class HttpServer {
                             ChannelPipeline p = ch.pipeline();
                             p.addLast(new HttpRequestDecoder());
                             p.addLast(new HttpResponseEncoder());
-                            p.addLast(new CustomHttpServerHandler());
+                            p.addLast(new CustomHttpServerHandler(endpoints));
                         }
                     }).option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);

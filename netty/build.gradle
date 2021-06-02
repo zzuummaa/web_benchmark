@@ -1,5 +1,12 @@
 plugins {
     id 'java'
+    id "com.github.johnrengelman.shadow" version "7.0.0"
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'ru.zuma.HttpServer'
+    }
 }
 
 group 'ru.zuma'
@@ -12,6 +19,8 @@ repositories {
 dependencies {
     // Netty
     implementation group: 'io.netty', name: 'netty-all', version: '4.1.24.Final'
+
+    implementation group: 'com.jsoniter', name: 'jsoniter', version: '0.9.23'
 
     // Logging
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.30'
