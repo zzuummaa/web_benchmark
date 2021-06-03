@@ -10,6 +10,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import ru.zuma.endpoint.RestEndpoint;
 import ru.zuma.endpoint.SnippetEndpoint;
+import ru.zuma.storage.MapSnippetService;
 
 import java.util.List;
 
@@ -32,7 +33,9 @@ public class HttpServer {
     public void run() throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        List<RestEndpoint> endpoints = List.of(new SnippetEndpoint("/snippet"));
+        List<RestEndpoint> endpoints = List.of(
+            new SnippetEndpoint("/snippet", new MapSnippetService())
+        );
 
         try {
             ServerBootstrap b = new ServerBootstrap();

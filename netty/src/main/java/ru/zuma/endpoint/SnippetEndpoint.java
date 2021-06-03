@@ -10,24 +10,58 @@ import ru.zuma.http.HttpMethod;
 import ru.zuma.http.HttpRequest;
 import ru.zuma.http.HttpResponse;
 import ru.zuma.model.Snippet;
+import ru.zuma.storage.SnippetService;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Optional;
 
 public class SnippetEndpoint extends RestEndpointBase {
+    private final SnippetService snippetService;
 
-    public SnippetEndpoint(String path) {
+    public SnippetEndpoint(String path, SnippetService snippetService) {
         super(path);
+        this.snippetService = snippetService;
     }
 
     @Override
     public HttpResponse<Object> handleRequest(HttpRequest request, Object body) {
-        if (request.method() == HttpMethod.POST) {
+        if (request.method() == HttpMethod.GET) {
+            return handleGetRequest(request, body);
+        } else if (request.method() == HttpMethod.POST) {
             return handlePostRequest(request, body);
         }
 
         return new HttpResponse<>(HttpResponseStatus.NOT_FOUND);
+    }
+
+    private HttpResponse<Object> handleGetRequest(HttpRequest request, Object body) {
+        if (request.parameters().isEmpty()) {
+            return new HttpResponse<>(HttpResponseStatus.NOT_IMPLEMENTED);
+        }
+
+        var id = request.parameters().get("id");
+        if (id == null || id.isEmpty()) {
+            return new HttpResponse<>(HttpResponseStatus.BAD_REQUEST);
+        }
+
+        Optional<String> snippet;
+        try {
+            snippet = snippetService.get(Integer.valueOf(id.get(0)));
+        } catch (NumberFormatException e) {
+            return new HttpResponse<>(HttpResponseStatus.BAD_REQUEST);
+        }
+
+        if (snippet.isEmpty()) {
+            return new HttpResponse<>(HttpResponseStatus.NOT_FOUND);
+        }
+
+        return new HttpResponse<>(
+                HttpResponseStatus.OK,
+                JsonStream.serialize(
+                    new Snippet(10, "Static snippet")
+                ));
     }
 
     private HttpResponse<Object> handlePostRequest(HttpRequest request, Object body) {

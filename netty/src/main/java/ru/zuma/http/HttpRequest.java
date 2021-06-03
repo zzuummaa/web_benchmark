@@ -21,7 +21,7 @@ public class HttpRequest {
         return path;
     }
 
-    public Map<String, List<String>> getParameters() {
+    public Map<String, List<String>> parameters() {
         return parameters;
     }
 
