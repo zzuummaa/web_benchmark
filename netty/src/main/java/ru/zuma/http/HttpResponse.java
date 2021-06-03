@@ -2,11 +2,13 @@ package ru.zuma.http;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
 
+import java.net.http.HttpHeaders;
 import java.util.Optional;
 
 public class HttpResponse<T> {
 
     private HttpResponseStatus responseStatus;
+    private HttpHeaders headers;
     private T body;
 
     public HttpResponse(HttpResponseStatus responseStatus) {

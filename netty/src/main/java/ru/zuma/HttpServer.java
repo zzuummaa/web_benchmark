@@ -13,8 +13,6 @@ import ru.zuma.endpoint.SnippetEndpoint;
 
 import java.util.List;
 
-import static java.util.List.of;
-
 public class HttpServer {
     private final int port;
 
@@ -47,7 +45,7 @@ public class HttpServer {
                             ChannelPipeline p = ch.pipeline();
                             p.addLast(new HttpRequestDecoder());
                             p.addLast(new HttpResponseEncoder());
-                            p.addLast(new CustomHttpServerHandler(endpoints));
+                            p.addLast(new EndpointHttpServerHandler(endpoints));
                         }
                     }).option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);

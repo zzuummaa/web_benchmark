@@ -13,20 +13,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.zuma.endpoint.RestEndpoint;
 
-import java.util.Collection;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.*;
+import static io.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
+import static io.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
-public class CustomHttpServerHandler extends SimpleChannelInboundHandler {
+public class EndpointHttpServerHandler extends SimpleChannelInboundHandler {
     private static final Logger logger = LoggerFactory.getLogger(HttpServer.class);
 
     private static final AttributeKey<ru.zuma.http.HttpRequest> REQUEST_ATTRIBUTE_KEY;
     private static final AttributeKey<Boolean> IS_KEEP_ALIVE_ATTRIBUTE_KEY;
-    private static final AttributeKey<StringBuilder> BODY_STRING_BUILDER_ATTRIBUTE_KEY;
+    private static final AttributeKey<ByteBuffer> BODY_BUFFER_ATTRIBUTE_KEY;
 
     private static <T> AttributeKey<T> tryInitAttributeKey(String keyName) {
         if (AttributeKey.exists(keyName)) {
@@ -40,13 +40,19 @@ public class CustomHttpServerHandler extends SimpleChannelInboundHandler {
     static {
         REQUEST_ATTRIBUTE_KEY = tryInitAttributeKey("request");
         IS_KEEP_ALIVE_ATTRIBUTE_KEY = tryInitAttributeKey("is_keep_alive");
-        BODY_STRING_BUILDER_ATTRIBUTE_KEY = tryInitAttributeKey("body_string_builder");
+        BODY_BUFFER_ATTRIBUTE_KEY = tryInitAttributeKey("body_string_builder");
     }
 
+    private final int maxBodySize;
     private List<RestEndpoint> restEndpoints;
 
-    public CustomHttpServerHandler(List<RestEndpoint> restEndpoints) {
+    public EndpointHttpServerHandler(List<RestEndpoint> restEndpoints) {
+        this(restEndpoints, 1024);
+    }
+
+    public EndpointHttpServerHandler(List<RestEndpoint> restEndpoints, int maxBodySize) {
         this.restEndpoints = restEndpoints;
+        this.maxBodySize = maxBodySize;
     }
 
     @Override
@@ -58,9 +64,13 @@ public class CustomHttpServerHandler extends SimpleChannelInboundHandler {
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof HttpRequest) {
             var request = (DefaultHttpRequest) msg;
+
+            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.uri());
+
             ctx.channel().attr(REQUEST_ATTRIBUTE_KEY).set(
                 new ru.zuma.http.HttpRequest(
-                    request.uri(),
+                    queryStringDecoder.path(),
+                    queryStringDecoder.parameters(),
                     NettyRequestUtil.convertToCommon(request.method()),
                     NettyRequestUtil.convertToCommon(request.headers())
                 )
@@ -69,36 +79,46 @@ public class CustomHttpServerHandler extends SimpleChannelInboundHandler {
         }
 
         if (msg instanceof HttpContent httpContent) {
-            var bodyBuilderAttribute = ctx.channel().attr(BODY_STRING_BUILDER_ATTRIBUTE_KEY);
+            var contentBuffer = httpContent.content();
+            var bodyBuilderAttribute = ctx.channel().attr(BODY_BUFFER_ATTRIBUTE_KEY);
 
             if (msg instanceof LastHttpContent trailer) {
                 FullHttpResponse response;
 
                 if (bodyBuilderAttribute.get() == null) {
-                    response = handleRequest(ctx.channel(), httpContent.content().toString(CharsetUtil.UTF_8));
+                    response = handleRequest(ctx.channel(), httpContent.content());
                 } else {
-                    bodyBuilderAttribute.get().append(httpContent.content().toString(CharsetUtil.UTF_8));
-                    response = handleRequest(ctx.channel(), bodyBuilderAttribute.get().toString());
+                    bodyBuilderAttribute.get().put(
+                        contentBuffer.array(),
+                        contentBuffer.readerIndex(),
+                        contentBuffer.writableBytes()
+                    );
+                    response = handleRequest(ctx.channel(), bodyBuilderAttribute.get());
                 }
 
                 writeResponse(ctx, response);
             } else {
-                bodyBuilderAttribute.set(new StringBuilder(httpContent.content().toString(CharsetUtil.UTF_8)));
+                bodyBuilderAttribute.set(ByteBuffer.allocate(maxBodySize));
+                bodyBuilderAttribute.get().put(
+                        contentBuffer.array(),
+                        contentBuffer.readerIndex(),
+                        contentBuffer.writableBytes()
+                );
             }
         }
     }
 
-    private FullHttpResponse handleRequest(Channel channel, String body) {
+    private <T> FullHttpResponse handleRequest(Channel channel, T body) {
         var request = channel.attr(REQUEST_ATTRIBUTE_KEY).get();
         var response = restEndpoints.stream()
-            .filter((e) -> e.getPath().equals(request.uri()))
+            .filter((e) -> e.getPath().equals(request.path()))
             .findFirst()
             .map((e) -> e.handleRequest(request, body));
 
-        return convertToNettyResponse(response);
+        return toNettyResponse(response);
     }
 
-    private FullHttpResponse convertToNettyResponse(Optional<ru.zuma.http.HttpResponse<Object>> httpResponseOptional) {
+    private FullHttpResponse toNettyResponse(Optional<ru.zuma.http.HttpResponse<Object>> httpResponseOptional) {
         if (httpResponseOptional.isEmpty()) {
             return new DefaultFullHttpResponse(
                     HTTP_1_1,
@@ -109,7 +129,7 @@ public class CustomHttpServerHandler extends SimpleChannelInboundHandler {
 
         var httpResponse = httpResponseOptional.get();
 
-        ByteBuf bodyByteBuf = (ByteBuf) httpResponse
+        ByteBuf bodyByteBuf = httpResponse
                 .body()
                 .map((o) -> Unpooled.copiedBuffer(o.toString(), CharsetUtil.UTF_8))
                 .orElse(Unpooled.EMPTY_BUFFER);
