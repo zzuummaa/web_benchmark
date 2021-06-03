@@ -17,8 +17,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Optional;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
-import static io.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
+import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 public class EndpointHttpServerHandler extends SimpleChannelInboundHandler {
@@ -62,9 +61,7 @@ public class EndpointHttpServerHandler extends SimpleChannelInboundHandler {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof HttpRequest) {
-            var request = (DefaultHttpRequest) msg;
-
+        if (msg instanceof HttpRequest request) {
             QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.uri());
 
             ctx.channel().attr(REQUEST_ATTRIBUTE_KEY).set(
@@ -79,31 +76,47 @@ public class EndpointHttpServerHandler extends SimpleChannelInboundHandler {
         }
 
         if (msg instanceof HttpContent httpContent) {
+
             var contentBuffer = httpContent.content();
-            var bodyBuilderAttribute = ctx.channel().attr(BODY_BUFFER_ATTRIBUTE_KEY);
+            var bodyBufAttribute = ctx.channel().attr(BODY_BUFFER_ATTRIBUTE_KEY);
+
+            if (contentBuffer.isReadable()) {
+                logger.info("{}", httpContent.content());
+            }
 
             if (msg instanceof LastHttpContent trailer) {
                 FullHttpResponse response;
 
-                if (bodyBuilderAttribute.get() == null) {
+                if (bodyBufAttribute.get() == null) {
                     response = handleRequest(ctx.channel(), httpContent.content());
                 } else {
-                    bodyBuilderAttribute.get().put(
-                        contentBuffer.array(),
+                    var sessionBuf = bodyBufAttribute.get();
+                    contentBuffer.getBytes(
                         contentBuffer.readerIndex(),
-                        contentBuffer.writableBytes()
+                        sessionBuf.array(),
+                        sessionBuf.arrayOffset(),
+                        contentBuffer.readableBytes()
                     );
-                    response = handleRequest(ctx.channel(), bodyBuilderAttribute.get());
+                    response = handleRequest(ctx.channel(), bodyBufAttribute.get());
                 }
 
                 writeResponse(ctx, response);
-            } else {
-                bodyBuilderAttribute.set(ByteBuffer.allocate(maxBodySize));
-                bodyBuilderAttribute.get().put(
-                        contentBuffer.array(),
+            } else if (contentBuffer.isReadable()) {
+                if (bodyBufAttribute.get() == null) {
+                    bodyBufAttribute.set(ByteBuffer.allocate(maxBodySize));
+                }
+
+                var sessionBuf = bodyBufAttribute.get();
+                if (sessionBuf.remaining() < contentBuffer.readableBytes()) {
+                    writeResponse(ctx, new DefaultFullHttpResponse(HTTP_1_1, INTERNAL_SERVER_ERROR, Unpooled.EMPTY_BUFFER));
+                } else {
+                    contentBuffer.getBytes(
                         contentBuffer.readerIndex(),
-                        contentBuffer.writableBytes()
-                );
+                        sessionBuf.array(),
+                        sessionBuf.arrayOffset(),
+                        contentBuffer.readableBytes()
+                    );
+                }
             }
         }
     }

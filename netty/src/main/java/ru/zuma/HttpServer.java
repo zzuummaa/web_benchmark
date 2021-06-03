@@ -21,7 +21,7 @@ public class HttpServer {
 
         int port = args.length > 0
                 ? Integer.parseInt(args[0])
-                : 8080;
+                : 8070;
 
         new HttpServer(port).run();
     }
@@ -31,7 +31,7 @@ public class HttpServer {
     }
 
     public void run() throws Exception {
-        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         List<RestEndpoint> endpoints = List.of(
             new SnippetEndpoint("/snippet", new MapSnippetService())
